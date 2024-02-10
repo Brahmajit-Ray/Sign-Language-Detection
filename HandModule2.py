@@ -3,21 +3,14 @@ import mediapipe as mp
 import torch
 import torchvision
 from torch import nn
+import numpy as np
 
 mpHands=mp.solutions.hands
 hands=mpHands.Hands()
 mpDraw= mp.solutions.drawing_utils
-
-alphabets=['0',
-  '1',
-  '2',
-  '3',
-  '4',
-  '5',
-  '6',
-  '7',
-  '8',
-  '9',
+#'0','1','2','3','4','5','6','7','8','9','10'
+'''
+alphabets=[
   'a',
   'b',
   'c',
@@ -43,28 +36,49 @@ alphabets=['0',
   'w',
   'x',
   'y',
-  'z']
+  'z']'''
+alphabets=['A',
+  'B',
+  'C',
+  'D',
+  'E',
+  'F',
+  'G',
+  'H',
+  'I',
+  'J',
+  'K',
+  'L',
+  'M',
+  'N',
+  'O',
+  'P',
+  'Q',
+  'R',
+  'S',
+  'T',
+  'U',
+  'V',
+  'W',
+  'X',
+  'Y',
+  'Z',
+  'del',
+  'nothing',
+  'space']
+
 device="cuda" if torch.cuda.is_available() else "cpu"
 
 def load_model(model_path):
     with torch.no_grad():
         predictor=torchvision.models.googlenet()
-        #predictor.classifier[3] = nn.Linear(in_features=1280, out_features=25)
-        '''predictor.classifier = nn.Sequential(
-            nn.Dropout(p=0.2),
-            nn.Linear(in_features=1280, out_features=512),
-            nn.Dropout(p=0.2),
-            nn.Linear(in_features=512, out_features=25)
-        )
-        predictor.classifier=nn.Sequential(
-            nn.Dropout(p=0.2),
-            nn.Linear(in_features=1280, out_features=256),
-            nn.Dropout(p=0.2),
-            nn.Linear(in_features=256, out_features=36)
-        )'''
         predictor.aux1=None
         predictor.aux2=None #LeNet
-        predictor.fc = nn.Linear(in_features=1024, out_features=36, bias=True)
+        predictor.fc=nn.Sequential(
+            nn.Linear(in_features=1024,out_features=256),
+            nn.Dropout(p=0.2),
+            nn.Linear(in_features=256,out_features=29)
+        )
         state_dict=torch.load(model_path,map_location=device)
         predictor.load_state_dict(state_dict)
         predictor.to(device)
@@ -73,17 +87,23 @@ def load_model(model_path):
 
 
 def predict_letter(model,img):
-    img=torch.Tensor(img)
-    img=img.reshape(3,224,224)
-    img=img.unsqueeze(dim=0)
-    labels=model(img)
-    labels=torch.softmax(labels,dim=1)
-    label=torch.argmax(labels,dim=1)
-    return label.item()
+    with torch.no_grad():
+        img=torch.Tensor(img)
+
+        img=img.reshape(3,64,64)
+        img=img/255.0
+        print(img)
+        img=img.unsqueeze(dim=0)
+        labels=model(img)
+
+        labels=torch.softmax(labels,dim=1)
+        print(labels)
+        label=torch.argmax(labels,dim=1)
+        return label.item()
 
 
 def find_hands(img):
-    model=load_model("Sign Language Model_LeNetV2_Try3.pth")
+    model=load_model("Sign Language Model_LeNet_Try8.pth")
     img_rgb = cv.cvtColor(img, cv.COLOR_BGR2RGB)
     h, w, c = img.shape
     results = hands.process(img_rgb)
@@ -115,9 +135,16 @@ def find_hands(img):
 
             cv.rectangle(img, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
             img2=img[y_min:y_max,x_min:x_max]
+
+
             if img2.size!=0:
+                #img_w = np.empty(img2.shape)
+                #img_w.fill(0)
+                #mpDraw.draw_landmarks(img_w, handLMs, mpHands.HAND_CONNECTIONS)
+
                 print(img2.shape)
-                img2=cv.resize(img2,(224,224))
+                img2=cv.resize(img2,(64,64))
+                cv.imshow("Imag", img2)
                 letter=predict_letter(model,img2)
                 cv.putText(img,alphabets[letter], (x_min+5, y_max+5), cv.FONT_HERSHEY_TRIPLEX, 3,(0, 255, 0), 2)
 
